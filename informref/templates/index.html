@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Version Index{% endblock %}
+{% block content %}
+
+<form id="version">
+	<select name="version" class="type-json-int" title="Something">
+		<option value="1">1</option>
+		<option value="1" selected>latest</option>
+        </select>
+	<button type="submit">submit</button>
+</form>
+
+{% endblock %}
