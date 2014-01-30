@@ -20,26 +20,26 @@ def check_keys(expected):
 
 @with_setup(setup)
 def test_create_retailer():
-    flake = model.create_retailer()
-    check_keys([model.format_retailer_key(flake)])
+    retailer = model.create_retailer()
+    check_keys([model.format_retailer_key(retailer.flake)])
 
 
 @with_setup(setup)
 def test_create_retailer_with_name():
-    flake = model.create_retailer(name=ex_name)
-    check_keys([model.format_retailer_key(flake), model.format_name_key(ex_name)])
+    retailer = model.create_retailer(name=ex_name)
+    check_keys([model.format_retailer_key(retailer.flake), model.format_name_key(ex_name)])
 
 
 @with_setup(setup)
 def test_create_retailer_with_same_name():
-    flake1 = model.create_retailer(name=ex_name)
+    retailer1 = model.create_retailer(name=ex_name)
     try:
         # name gets normalized to same as above
         model.create_retailer(name=ex_same_name)
         ok_(False, "we should ever get here")
     except model.RetailerNameInUse as exc:
-        eq_(exc.other, flake1)
-    check_keys([model.format_retailer_key(flake1), model.format_name_key(ex_name)])
+        eq_(exc.other, retailer1.flake)
+    check_keys([model.format_retailer_key(retailer1.flake), model.format_name_key(ex_name)])
 
 
 class BreakWatch(object):
@@ -85,21 +85,27 @@ def test_create_retailer_watch_error_name():
 
 @with_setup(setup)
 def test_get_retailer():
-    flake = model.create_retailer(name=ex_name)
-    retailer = model.get_retailer(flake)
+    retailer = model.create_retailer(name=ex_name)
+    retailer = model.get_retailer(retailer.flake)
     eq_(retailer.name, ex_name)
 
 
 @with_setup(setup)
 def test_delete_retailer():
-    flake = model.create_retailer()
-    model.delete_retailer(flake)
+    retailer = model.create_retailer()
+    model.delete_retailer(retailer.flake)
     check_keys([])
 
 
 @with_setup(setup)
 def test_delete_retailer_with_name():
-    flake = model.create_retailer(name=ex_name)
-    model.delete_retailer(flake)
+    retailer = model.create_retailer(name=ex_name)
+    model.delete_retailer(retailer.flake)
     check_keys([])
 
+
+@with_setup(setup)
+def test_find_retailer_by_name():
+    created = model.create_retailer(name=ex_name)
+    found = model.find_retailer_by_name(name=ex_name)
+    eq_(created.flake, found.flake)

@@ -36,9 +36,12 @@ def create_retailer(**kw):
 
 
 def get_retailer(flake):
+    flake = int(flake)
     retailer = Retailer.hmget(redis_client, format_retailer_key(flake))
     retailer.flake = flake
-    return retailer
+    if hasattr(retailer, 'name'):
+        # every retailer must have a name
+        return retailer
 
 
 def delete_retailer(flake):
@@ -52,8 +55,12 @@ def delete_retailer(flake):
         pipe.execute()
     finally:
         pipe.reset()
-    print "KEYS:", redis_client.keys()
 
+
+def find_retailer_by_name(name):
+    flake = redis_client.get(format_name_key(name))
+    if flake is not None:
+        return get_retailer(flake)
 
 
 def attempt_create_retailer(name=None):

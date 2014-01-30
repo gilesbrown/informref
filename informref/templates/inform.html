@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+{% macro inform_form(form) %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title"><span class="glyphicon glyphicon-transfer"></span> {{ form.id }}</h3>
+  </div>
+  <div class="panel-body">
+    <form id="{{ form.id }}" action="{{ form.browser_action }}"{% if form.method %} method="{{ form.browser_method }}"{% endif %}>
+      {%- for field in form.fields %}
+      {%   if is_select(field) %}
+            {{ inform_form_select(field) }}
+      {%   else %}
+            {{ inform_form_input(field) }}
+      {%   endif %}
+      {%- endfor -%}
+      <button type="submit">{{ form.id }}</button>
+    </form>
+  </div>
+</div>
+{%- endmacro %}
+{% macro inform_form_select(select) %}
+  <select name="{{ select.name }}">
+  {%- for optkey, optval, optsel in select.options() %}
+    <option value="{{ optval }}"{% if optsel %} selected="selected"{% endif %}>{{ optkey }}</option>
+  {%- endfor %}
+  </select>
+{%- endmacro %}
+{% macro inform_form_input(input) %}
+  <input name="{{ input.name }}" type="{{ input.type }}" />
+{%- endmacro %}
+{% macro inform_link(link) %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+      <h3 class="panel-title">
+          <span class="glyphicon glyphicon-link"></span>
+          <a id="{{ link.id }}" href="{{ link.href }}""">{{ link.id }}</a>
+      </h3>
+  </div>
+</div>
+{%- endmacro %}
+{% macro inform_value(value) %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title"><span class="glyphicon glyphicon-tag"></span> {{ value.id }}</h3>
+  </div>
+  <div class="panel-body">
+    <code id="{{ value.id }}">{{ '%r' | format(value) }}</code>
+  </div>
+</div>
+{%- endmacro %}
+<html>
+
+  <head>
+    <title>{% block title %}Inform Reference{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+  </head>
+  <body>
+
+    <div class="container">
+
+      <div class="page-header">
+        <h2>"{{ request.method }} {{ request.url }}" {{ status_code }}</h2>
+      </div>
+
+      {% if errors %}
+      <ul id="errors">
+      {%   for error in errors %}
+        <li>{{ error }}</li>
+      </ul>
+      {%   endfor %}
+      {% endif %}
+
+      {% if messages %}
+      <ul id="messages">
+      {%   for message in messages %}
+        <li>{{ message }}</li>
+      </ul>
+      {%   endfor %}
+      {% endif %}
+
+      {# loop through the inform resource attributes #}
+      {% for attr in attributes %}
+      {%   if is_form(attr) %}
+    {{ inform_form(attr) }}
+      {%   elif is_link(attr) %}
+      {{ inform_link(attr) }}
+      {%   else %}
+      {{ inform_value(attr) }}
+      {%   endif %}
+      {% endfor %}
+
+    </div>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://code.jquery.com/jquery.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+  </body>
+</html>
