@@ -15,17 +15,17 @@ num_create_retries = 7
 FINAL = object()
 UNDEFINED = object()
 
-class normalized(unicode):
+lowercase = methodcaller('lower')
+
+class normalize_space(unicode):
     def __new__(cls, string, *args):
         string = u' '.join(string.split())
         return unicode.__new__(cls, string, *args)
-
+    
 
 class Retailer(Hash):
     namespace = ('retailer',)
-    name = HashField(type=normalized, nullable=False, unique=methodcaller('lower'))
-    def __init__(self, key, **kw):
-        self.name = kw.pop('name')
+    name = HashField(type=normalize_space, nullable=False, unique=lowercase)
 
 
 def create_retailer(**kw):

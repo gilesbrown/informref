@@ -9,6 +9,10 @@ class NotUnique(Exception):
         self.other = other
         self.field = field
         self.value = value
+        
+        
+class MissingRequiredField(Exception):
+    pass
 
 
 class HashField(object):
@@ -78,13 +82,17 @@ class Hash(object):
             if value is not UNDEFINED:
                 setattr(hashobj, name, value)
             elif not field.nullable:
-                raise TypeError("value for '%s' is required" % field.name)
+                raise MissingRequiredField("value for '%s' is required" % field.name)
 
         if kw:
             raise TypeError('unexpected keyword arguments %r' % kw.keys())
 
         return hashobj
-
+   
+    @staticmethod 
+    def field(*args, **kwargs):
+        return HashField(*args, **kwargs)
+    
     @property
     def key(self):
         return self.__key__

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for
 from informref import middleware
-from informref import model
+from informref import model, redishash
 from informref.elements import Value, Link, Form, Input, Select, inform_jinja_functions
 
 app = Flask(__name__)
@@ -35,27 +35,34 @@ def home():
 
 @app.route('/v1')
 def v1():
-    return render([Link('retailer_index', url_for('retailer_index'))])
+    attr = [
+        Form('create_retailer', Input('name'), action=url_for('retailer_create'), method='POST'),
+        Form('find_retailer', Input('name'), action=url_for('retailer_find')),
+        Form('create_or_find_retailer', Input('name'), action=url_for('retailer_create_or_find'), method='POST'),
+        Link('retailer_index', url_for('retailer_index')),
+    ]
+    return render(attr)
 
 
 @app.route('/retailer/')
 def retailer_index():
     attributes = [
-        Form('create', Input('name'), action=url_for('retailer_create'), method='POST'),
-        Form('find', Input('name'), action=url_for('retailer_find')),
-        Form('create_or_find', Input('name'), action=url_for('retailer_create_or_find'), method='POST'),
     ]
     return render(attributes)
 
 
 @app.route('/retailer/create', methods=['POST'])
 def retailer_create():
+    print "HEY:", request.form.items()
     kwargs = {k: v for k, v in request.form.items() if v.strip()}
     try:
         retailer = model.create_retailer(**kwargs)
-        attributes = [Link('created', url_for('retailer', flake=retailer.flake))]
+        attributes = [Link('created', url_for('retailer', id=retailer.id))]
         return render(attributes=attributes, status_code=201)
-    except model.RetailerNameInUse:
+    except redishash.MissingRequiredField:
+        errors=["Missing required field"]
+        return render(errors=errors, status_code=400)
+    except redishash.NotUnique:
         errors=["Name '%s' is already in use" % request.form['name']]
         return render(errors=errors, status_code=409)
 
@@ -65,10 +72,10 @@ def retailer_create_or_find():
     kwargs = {k: v for k, v in request.form.items() if v.strip()}
     try:
         retailer = model.create_retailer(**kwargs)
-        attributes = [Link('created', url_for('retailer', flake=retailer.flake))]
+        attributes = [Link('created', url_for('retailer', id=retailer.id))]
         return render(attributes=attributes, status_code=201)
     except model.RetailerNameInUse as exc:
-        return redirect(url_for('retailer', flake=exc.other), 303)
+        return redirect(url_for('retailer', id=exc.other), 303)
 
 
 @app.route('/retailer/find', methods=['GET'])
@@ -78,23 +85,23 @@ def retailer_find():
     if retailer is None:
         errors = ["No such retailer"]
         return render(errors=errors, status_code=404)
-    return redirect(url_for('retailer', flake=retailer.flake), 302)
+    return redirect(url_for('retailer', id=retailer.id), 302)
 
 
-@app.route('/retailer/<int:flake>', methods=['GET', 'DELETE'])
-def retailer(flake):
+@app.route('/retailer/<int:id>', methods=['GET', 'DELETE'])
+def retailer(id):
 
-    retailer = model.get_retailer(flake)
+    retailer = model.get_retailer(id)
     if not retailer:
         return render(errors=['No such retailer'], status_code=404)
 
     if request.method == 'DELETE':
-        model.delete_retailer(flake)
+        model.delete_retailer(id)
         return render(messages=["Deleted '%s'" % request.url], status_code=200)
     else:
         delete = Form(
             'delete',
-            action=url_for('retailer', flake=flake),
+            action=url_for('retailer', id=id),
             method="DELETE",
         )
         return render(attributes=[Value('name', retailer.name), delete], status_code=200)
