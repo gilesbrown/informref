@@ -1,6 +1,8 @@
 """ Mapping of redis to objects. """
 
 import json
+from itertools import islice, izip_longest, tee
+
 
 
 UNDEFINED = object()
@@ -8,6 +10,13 @@ UNDEFINED = object()
 
 class ConstraintError(Exception):
     pass
+
+
+
+def n_wise(iterable, n):
+    n_iterators = tee(iterable, n)
+    zippables = (islice(it, j, None, n) for j, it in enumerate(n_iterators))
+    return izip_longest(*zippables)
 
 
 class NotUnique(ConstraintError):
@@ -20,7 +29,7 @@ class NotUnique(ConstraintError):
         self.id = id
         self.name = name
         self.value = value
-    
+
 
 class HashField(object):
     """ Descriptor for making redis hash fields look like attributes. """
@@ -36,44 +45,43 @@ class HashField(object):
         self._encode = kw.pop('encode', json.dumps)
         self._decode = kw.pop('encode', json.loads)
 
-    def check_unique(self, hashobj, redis, pipe=None): 
-        
-        value = self.unique_value(hashobj)  
+    def check_unique(self, hashobj, redis, pipe=None):
+
+        value = self.unique_value(hashobj)
         if value is UNDEFINED:
             return
-        
+
         key = hashobj.__class__.relative_key('unique', self.name)
-            
+
         if pipe is not None:
             pipe.watch(key)
-            
+
         score = redis.zscore(key, value)
         if score is None:
             return
-            
+
         id = int(score)
         if id == hashobj.id:
             return
-        
+
         raise NotUnique(value, self.name, id, hashobj.__class__)
-    
-    def set_unique(self, hashobj, redis, pipe): 
-        value = self.unique_value(hashobj) 
+
+    def set_unique(self, hashobj, redis, pipe):
+        value = self.unique_value(hashobj)
         if value is not UNDEFINED:
             key = hashobj.__class__.relative_key('unique', self.name)
             self.delete_unique(hashobj, redis, pipe)
             pipe.zadd(key, value, hashobj.id)
-            
+
     def delete_unique(self, hashobj, redis, pipe):
         key = hashobj.__class__.relative_key('unique', self.name)
         pipe.zremrangebyscore(key, hashobj.id, hashobj.id)
 
     def unique_value(self, hashobj):
-        
+
         if not self.unique:
             return UNDEFINED
-        
-        key = hashobj.__class__.relative_key('unique', self.name)
+
         value = getattr(hashobj, self.name, UNDEFINED)
         if value is not UNDEFINED:
             if hasattr(self.unique, '__call__'):
@@ -81,9 +89,9 @@ class HashField(object):
             else:
                 value = value
             return value
-        
+
         return UNDEFINED
-            
+
     def __get__(self, hashobj, hashtype):
         if hashobj is None:
             return self
@@ -123,7 +131,7 @@ class HashWithFields(type):
         return super(HashWithFields, mcs).__new__(mcs, name, bases, clsdict)
 
 class Hash(object):
-    
+
     __metaclass__ = HashWithFields
     #__metaclass__ = HashFields
 
@@ -131,7 +139,6 @@ class Hash(object):
 
     def __init__(self, id=None, **kw):
         super(Hash, self).__init__()
-        print '__init__ ID', id
         if id is None:
             raise ValueError
         self.id = id
@@ -148,11 +155,10 @@ class Hash(object):
     @classmethod
     def create(cls, redis, **kw):
         id = redis.incr(cls.relative_key('incr'))
-        print 'CREATE ID:', id
         instance = cls(id, **kw)
         instance.hmset(redis)
         return instance
-    
+
     @classmethod
     def get(cls, redis, id):
         names = cls.__fields__.keys()
@@ -163,25 +169,24 @@ class Hash(object):
             return None
         decoded = {n: cls.__fields__[n].decode(v) for n, v in zip(names, values) if v is not None}
         return cls(id, **decoded)
- 
+
     def hmset(self, redis):
-        
+
         assert self.id is not None
-        
+
         pipe = redis.pipeline()
-        uniques = []
         for field in self.__fields__.values():
             if field.unique:
                 field.check_unique(self, redis, pipe)
-            
+
         hash_key = self.__class__.relative_key(self.id)
         ids_key = self.__class__.relative_key('ids')
-        
+
         pipe.watch(hash_key)
-        
+
         dirty = self.__dict__.pop('_dirty', {})
-           
-        try: 
+
+        try:
             pipe.multi()
             _test_watch_hook(self)
             if dirty:
@@ -191,21 +196,21 @@ class Hash(object):
                     field.set_unique(self, redis, pipe)
             pipe.sadd(ids_key, self.id)
             pipe.execute()
-                
+
         finally:
             pipe.reset()
-            
+
     def delete(self, redis):
-        
+
         assert self.id is not None
-        
+
         pipe = redis.pipeline()
         hash_key = self.__class__.relative_key(self.id)
         ids_key = self.__class__.relative_key('ids')
-        
+
         pipe.watch(hash_key)
-        
-        try: 
+
+        try:
             pipe.multi()
             _test_watch_hook(self)
             pipe.delete(hash_key)
@@ -214,10 +219,32 @@ class Hash(object):
                     field.delete_unique(self, redis, pipe)
             pipe.srem(ids_key, self.id)
             pipe.execute()
-                
+
         finally:
             pipe.reset()
-            
+
+    @classmethod
+    def sort(cls, redis, by=None, get=None):
+        get_list = ['#']
+        ids_key = cls.relative_key('ids')
+        if get is None:
+            get_fields = cls.__fields__.values()
+
+
+        get_list.extend((cls.relative_key('*->{0.name}'.format(f))
+                         for f in get_fields))
+
+        instances = []
+        for row in n_wise(redis.sort(ids_key, get=get_list), n=len(get_list)):
+            kw = {}
+            for field, value in zip(get_fields, row[1:]):
+                kw[field.name] = field.decode(value)
+            instances.append(cls(int(row[0]), **kw))
+
+        return instances
+
+
+
 
 
 def _do_nothing(instance):
@@ -225,41 +252,3 @@ def _do_nothing(instance):
 
 # used for testing
 _test_watch_hook = _do_nothing
-
-#    @staticmethod 
-#    def field(*args, **kwargs):
-#        return HashField(*args, **kwargs)
-#    
-#    @property
-#    def seq(self):
-#        return int(self.key.rpartition(self.__class__.sep)[2])
-#
-#    @classmethod
-#    def relkey(cls, *parts):
-#        return cls.sep.join(cls.namespace + tuple(str(p) for p in parts))
-
-# class HashField(object):
-#     def __get__(self, obj, objtype):
-#         print "__get__"
-#         return 42
-# 
-# class HashWithFields(type):
-#     def __new__(mcs, name, bases, dict):
-#         print "__new__", mcs, name, bases, dict
-#         #return super(metacls, mcs).__new__(mcs, name, bases, dict)
-#         return type.__new__(mcs, name, bases, dict)
-#     #def __init__(self, name, bases, d):
-#     #    type.__init__(self, name, bases, d)
-#     #    print "__init__", self
-# 
-# class Hash(object):
-#     __metaclass__ = HashWithFields
-#     def __init__(self, **kw):
-#         print "Base Init", kw
-#     @classmethod
-#     def create(cls, **kw):
-#         return cls(**kw)
-# 
-# class Derived(Hash):
-#     f = HashField()
-
