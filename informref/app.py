@@ -1,11 +1,35 @@
 from flask import Flask, render_template, request, redirect, url_for
+from jinja2 import evalcontextfilter, Markup, escape
 from informref import middleware
-from informref import model, redishash
+from informref import model, redisobjects
 from informref.elements import Value, Link, Form, Input, Select, inform_jinja_functions
 
 app = Flask(__name__)
 app.wsgi_app = middleware.MethodFromParam(app.wsgi_app)
 app.jinja_env.globals.update(inform_jinja_functions)
+
+@evalcontextfilter
+def inform_value(eval_ctx, value):
+
+    if isinstance(value, Value):
+        id = value.id
+        value = value.value
+    else:
+        id = None
+
+    module = eval_ctx.environment.get_template('inform.html').module
+    if hasattr(value, '__iter__'):
+        if hasattr(value, 'items'):
+            return module.inform_dl(value, id)
+        else:
+            return module.inform_ol(value, id)
+    else:
+        result = escape(value)
+    if eval_ctx.autoescape:
+        result = Markup(result)
+    return result
+app.jinja_env.filters['inform_value'] = inform_value
+
 
 
 def render(attributes=[], messages=[], warnings=[], errors=[], status_code=200):
@@ -46,7 +70,10 @@ def v1():
 
 @app.route('/retailer/')
 def retailer_index():
+    retailers = model.retailer_index()
+    print "SORT:", retailers
     attributes = [
+        Value('retailers', retailers),
     ]
     return render(attributes)
 
@@ -59,10 +86,10 @@ def retailer_create():
         retailer = model.create_retailer(**kwargs)
         attributes = [Link('created', url_for('retailer', id=retailer.id))]
         return render(attributes=attributes, status_code=201)
-    except redishash.MissingRequiredField:
+    except redisobjects.NotNullable:
         errors=["Missing required field"]
         return render(errors=errors, status_code=400)
-    except redishash.NotUnique:
+    except redisobjects.NotUnique:
         errors=["Name '%s' is already in use" % request.form['name']]
         return render(errors=errors, status_code=409)
 

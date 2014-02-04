@@ -38,15 +38,30 @@
   </div>
 </div>
 {%- endmacro %}
-{% macro inform_value(value) %}
+{% macro inform_value_attr(value) %}
 <div class="panel panel-default">
   <div class="panel-heading">
     <h3 class="panel-title"><span class="glyphicon glyphicon-tag"></span> {{ value.id }}</h3>
   </div>
   <div class="panel-body">
-    <code id="{{ value.id }}">{{ '%r' | format(value) }}</code>
+    {{ value | inform_value }}
   </div>
 </div>
+{%- endmacro %}
+{% macro inform_dl(obj, id=None) %}
+  <dl{% if id %} id="{{ id }}"{% endif %}>
+    {% for key, value in obj.items() %}
+    <dt>{{ key | inform_value }}</dd>
+    <dd><code>{{ value | inform_value }}</code></dt>
+    {% endfor %}
+  </dl>
+{%- endmacro %}
+{% macro inform_ol(iterable, id=None) %}
+  <ol{% if id %} id="{{ id }}"{% endif %}>
+    {% for obj in iterable %}
+    <li>{{ obj | inform_value }}</li>
+    {% endfor %}
+  </ol>
 {%- endmacro %}
 <html>
 
@@ -86,7 +101,7 @@
       {%   elif is_link(attr) %}
       {{ inform_link(attr) }}
       {%   else %}
-      {{ inform_value(attr) }}
+      {{ inform_value_attr(attr) }}
       {%   endif %}
       {% endfor %}
 

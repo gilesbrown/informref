@@ -31,6 +31,10 @@ class NotUnique(ConstraintError):
         self.value = value
 
 
+class NotNullable(ConstraintError):
+    pass
+
+
 class HashField(object):
     """ Descriptor for making redis hash fields look like attributes. """
 
@@ -92,7 +96,7 @@ class HashField(object):
 
         return UNDEFINED
 
-    def __get__(self, hashobj, hashtype):
+    def __get__(self, hashobj, hashtype=None):
         if hashobj is None:
             return self
         assert self.name is not UNDEFINED
@@ -189,6 +193,7 @@ class Hash(object):
         try:
             pipe.multi()
             _test_watch_hook(self)
+            print "DIRTY?", dirty
             if dirty:
                 pipe.hmset(hash_key, dirty)
             for field in self.__fields__.values():
@@ -239,6 +244,7 @@ class Hash(object):
             kw = {}
             for field, value in zip(get_fields, row[1:]):
                 kw[field.name] = field.decode(value)
+            print "HMM:", row, kw
             instances.append(cls(int(row[0]), **kw))
 
         return instances
