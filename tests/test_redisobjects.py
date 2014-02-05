@@ -104,7 +104,7 @@ def test_hash_create_same_name():
         state1 = State.create(redis, name=' California ', abbreviation='ca')
         ok_(False)
     except NotUnique as exc:
-        eq_(exc.id, 1)
+        eq_(exc.other, 1)
 
 
 @with_setup(setup)
@@ -119,7 +119,7 @@ def test_hash_update():
 @with_integrity_check
 def test_hash_hmget():
     created = State.create(redis, name=' California ', abbreviation='ca')
-    got = State.get(redis, created.id)
+    got = State.hmget(redis, created.id)
     eq_(created.id, got.id)
     eq_(created.name, got.name)
     eq_(created.abbreviation, got.abbreviation)
@@ -131,7 +131,7 @@ def test_hash_delete():
     created = State.create(redis, name=' California ', abbreviation='ca')
     instance = State(created.id)
     instance.delete(redis)
-    got = State.get(redis, created.id)
+    got = State.hmget(redis, created.id)
     eq_(got, None)
 
 

@@ -36,32 +36,20 @@ class Retailer(Hash):
 def create_retailer(**kw):
     for attempt in chain(xrange(num_create_retries), (FINAL,)):
         try:
-            r =Retailer.create(redis_client, **kw)
-            print "HGETALL[1]", redis_client.hgetall('retailer:1'), kw
-            return r
+            return Retailer.create(redis_client, **kw)
         except redis.WatchError:
             if attempt is FINAL:
                 raise
 
 
-def get_retailer(seq):
-    retailer = Retailer.hmget(redis_client, Retailer.relkey(seq))
-    if hasattr(retailer, 'name'):
-        # every retailer must have a name
-        return retailer
+def get_retailer(id):
+    return Retailer.hmget(redis_client, id)
 
 
 def delete_retailer(seq):
     retailer = get_retailer(seq)
-    pipe = redis_client.pipeline()
-    pipe.multi()
-    try:
-        #if hasattr(retailer, 'name'):
-        #    pipe.delete(format_name_key(retailer.name))
-        pipe.delete(retailer.key)
-        pipe.execute()
-    finally:
-        pipe.reset()
+    if retailer is not None:
+        retailer.delete(redis_client)
 
 
 def find_retailer_by_name(name):
@@ -72,8 +60,7 @@ def find_retailer_by_name(name):
 
 
 def retailer_index():
-    print "HGETALL[1]", redis_client.hgetall('retailer:1')
-    return [r.dictify() for r in Retailer.sort(redis_client)]
+    return Retailer.sort(redis_client)
 
 
 format_retailer_key = u'retailer:{0}'.format

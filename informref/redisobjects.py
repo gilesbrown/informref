@@ -20,13 +20,13 @@ def n_wise(iterable, n):
 
 
 class NotUnique(ConstraintError):
-    def __init__(self, value, name, id, hashcls):
+    def __init__(self, value, name, other, hashcls):
         msg = "instance %d of %s is already using %r for field '%s'" % (
-            id, hashcls, value, name,
+            other, hashcls, value, name,
         )
         ConstraintError.__init__(self, msg)
         self.hashcls = hashcls
-        self.id = id
+        self.other = other
         self.name = name
         self.value = value
 
@@ -164,7 +164,7 @@ class Hash(object):
         return instance
 
     @classmethod
-    def get(cls, redis, id):
+    def hmget(cls, redis, id):
         names = cls.__fields__.keys()
         hash_key = cls.relative_key(id)
         ids_key = cls.relative_key('ids')

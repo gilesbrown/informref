@@ -23,6 +23,8 @@ def inform_value(eval_ctx, value):
             return module.inform_dl(value, id)
         else:
             return module.inform_ol(value, id)
+    elif isinstance(value, Link):
+        return module.inform_link(value, id)
     else:
         result = escape(value)
     if eval_ctx.autoescape:
@@ -63,14 +65,18 @@ def v1():
         Form('create_retailer', Input('name'), action=url_for('retailer_create'), method='POST'),
         Form('find_retailer', Input('name'), action=url_for('retailer_find')),
         Form('create_or_find_retailer', Input('name'), action=url_for('retailer_create_or_find'), method='POST'),
-        Link('retailer_index', url_for('retailer_index')),
+        Link(url_for('retailer_index'), 'retailer_index'),
     ]
     return render(attr)
 
 
 @app.route('/retailer/')
 def retailer_index():
-    retailers = model.retailer_index()
+    retailers = []
+    for retailer in model.retailer_index():
+        retailer_dict = retailer.dictify()
+        retailer_dict['url'] = Link(url_for('retailer', id=retailer.id))
+        retailers.append(retailer_dict)
     print "SORT:", retailers
     attributes = [
         Value('retailers', retailers),
@@ -84,7 +90,7 @@ def retailer_create():
     kwargs = {k: v for k, v in request.form.items() if v.strip()}
     try:
         retailer = model.create_retailer(**kwargs)
-        attributes = [Link('created', url_for('retailer', id=retailer.id))]
+        attributes = [Link(url_for('retailer', id=retailer.id), 'created')]
         return render(attributes=attributes, status_code=201)
     except redisobjects.NotNullable:
         errors=["Missing required field"]
@@ -99,9 +105,9 @@ def retailer_create_or_find():
     kwargs = {k: v for k, v in request.form.items() if v.strip()}
     try:
         retailer = model.create_retailer(**kwargs)
-        attributes = [Link('created', url_for('retailer', id=retailer.id))]
+        attributes = [Link(url_for('retailer', id=retailer.id), 'created')]
         return render(attributes=attributes, status_code=201)
-    except model.RetailerNameInUse as exc:
+    except redisobjects.NotUnique as exc:
         return redirect(url_for('retailer', id=exc.other), 303)
 
 

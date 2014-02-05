@@ -47,7 +47,7 @@ def is_link(obj):
     return isinstance(obj, Link)
 
 class Link(object):
-    def __init__(self, id, href):
+    def __init__(self, href, id=None):
         self.id = id
         self.href = href
 
