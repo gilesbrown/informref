@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 from jinja2 import evalcontextfilter, Markup, escape
 from informref import middleware
 from informref import model, redisobjects
@@ -138,6 +138,14 @@ def retailer(id):
             method="DELETE",
         )
         return render(attributes=[Value('name', retailer.name), delete], status_code=200)
+
+@app.route('/example')
+def example():
+    return render_template('example.html')
+
+@app.route('/informed.js')
+def send_informed():
+    return app.send_static_file('informed.js')
 
 
 if __name__ == '__main__':
